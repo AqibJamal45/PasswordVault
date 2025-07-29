@@ -5,10 +5,11 @@ from functools import partial
 import uuid
 import base64
 import os
+from tkinter import messagebox
 
 #Database
 
-with sqlite3.connect("passwordVault.db") as db:
+with sqlite3.connect("PasswordVault\passwordVault.db") as db:
     cursor = db.cursor()
 
 cursor.execute("""
@@ -19,7 +20,7 @@ password TEXT NOT NULL);
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS vault(
-id INTEGER PRIMARY KEY,
+id INTEGER PRIMARY KEY AUTOINCREMENT,
 website TEXT NOT NULL,
 username TEXT NOT NULL,
 password TEXT NOT NULL);
@@ -110,6 +111,30 @@ def loginScreen():
     button = Button(window, text="Enter", command=checkPass)
     button.pack(pady=10)
 
+def resetMasterPassword():
+    current_password = simpledialog.askstring("Verify", "Enter current master password:", show='*', parent=window)
+    if not current_password:
+        return
+
+    hashed_current = hashPassword(current_password.encode("utf-8"))
+    cursor.execute("SELECT * FROM masterPassword WHERE id = 1 AND password = ?", [hashed_current])
+    if not cursor.fetchone():
+        messagebox.showerror("Error", "Incorrect current password.")
+        return
+
+    new_password = simpledialog.askstring("New Password", "Enter new master password:", show='*', parent=window)
+    if not new_password:
+        return
+    confirm_password = simpledialog.askstring("Confirm Password", "Re-enter new password:", show='*', parent=window)
+    if new_password != confirm_password:
+        messagebox.showerror("Error", "Passwords do not match.")
+        return
+
+    hashed_new = hashPassword(new_password.encode("utf-8"))
+    cursor.execute("UPDATE masterPassword SET password = ? WHERE id = 1", [hashed_new])
+    db.commit()
+    messagebox.showinfo("Success", "Master password updated.")
+
 def passwordVault():
     for widget in window.winfo_children():
         widget.destroy()
@@ -143,7 +168,13 @@ def passwordVault():
 
     button = Button(window, text="Add", command=addEntry)
     button.grid(column=1,pady=10)
+
+    button2 = Button(window, text="Reset Master Password", command=resetMasterPassword)
+    button2.grid(column=2,row=1,pady=5)
     
+    button3 = Button(window, text="Refresh", command=passwordVault)
+    button3.grid(column=0,row=1, pady=10)
+
     label = Label(window, text="Website")
     label.grid(row=2, column=0, padx=80)
     label = Label(window, text="Username")
